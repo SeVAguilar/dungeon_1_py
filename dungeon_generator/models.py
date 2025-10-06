@@ -83,7 +83,25 @@ class Explorador:
     def mover(self, direccion: str) -> bool:
         # Metodo para moverse entre habitaciones conectadas, retorna True si el 
         # movimiento fue exitoso y actualiza la posicion_actual
-        pass
+        
+        # Obtener posicion actual
+        habitacion_actual = self.mapa.habitaciones.get(self.posicion_actual)
+
+        if habitacion_actual is None:
+            return False # No hay habitacion en la pocision actual
+        
+        # verificar si la direccion existe en las conexiones
+        if direccion not in habitacion_actual.conexiones:
+            return False # No hay conexiones en esa direccion     
+        
+        # Obtener la habitacion destino
+        habitacion_destino = habitacion_actual.conexiones[direccion]
+
+        # Actualizar la posicion actual
+        self.posicion_actual = (habitacion_destino.x, habitacion_destino.y)
+
+        return True # Movimiento realizado
+
 
     def explorar_habitacion(self) -> str:     
         # Interactuar con el contenido de la habitación actual y marcarla 
@@ -93,15 +111,25 @@ class Explorador:
     
     def obtener_habitaciones_adyacentes(self) -> list[str]:
         # Metodo para listar direcciones disponibles desde la posición actual
-        pass
+        habitacion_actual = self.mapa.habitaciones.get(self.posicion_actual)
+
+        if habitacion_actual is None:
+            return [] # En la posicion actual no hay habitacion
+        
+        # Retorna las claves del diccionario de "conexiones"
+        return list(habitacion_actual.conexiones.keys())
+    
+    
     def recibir_dano(self, cantidad: int):
         # Metodo para reducir la vida del explorador
-        pass
+        self.vida -= cantidad
+        if self.vida < 0:
+            self.vida = 0 # Evita que la vida sea negativa
 
     @property
     def esta_vivo(self) -> bool:
         # Metodo para verificar si el explorador tiene vida restante
-        pass
+        return self.vida > 0
     
 @dataclass
 class ContenidoHabitacion:
