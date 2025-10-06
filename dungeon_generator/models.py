@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import random 
 
 @dataclass
 class Habitacion:
@@ -39,8 +40,88 @@ class Mapa:
     habitacion_inicial: Habitacion | None = None
 
     def generar_estructura(self, n_habitaciones: int):
-        # Metodo que genera la estructura del mapa
-        pass
+        # Metodo que genera la estructura del mapa con conexiones aleatorias
+        max_habitaciones = self.ancho * self.alto
+        
+        
+        if n_habitaciones > max_habitaciones:
+            raise ValueError(
+                f"No se pueden crear {n_habitaciones} habitaciones en un mapa de {self.ancho}x{self.alto}"
+            )
+        if n_habitaciones < 1:
+            raise ValueError("Debe haber al menos 1 habitacion")
+        
+        # Limpiar habitaciones
+        self.habitaciones.clear()
+        self.habitacion_inicial = None
+
+        # Generar posiciones aleatorias
+        todas_posiciones = [(x, y) for x in range(self.ancho) for y in range(self.alto)]
+        posiciones_habitaciones = random.sample(todas_posiciones, n_habitaciones)
+
+        # Elegir habitacion inicial en el borde
+        posiciones_borde = [
+            pos for pos in posiciones_habitaciones
+            if pos[0] == 0 or pos[0] == self.ancho-1 
+            or pos[1] == 0 or pos[1] == self.alto-1
+        ]
+
+        if posiciones_borde:
+            pos_inicial = random.choice(posiciones_borde)
+        else:
+            pos_inicial = posiciones_habitaciones[0]
+
+        # Crear las habitaciones
+        for i, (x, y) in enumerate(posiciones_habitaciones):
+            es_inicial = (x, y) == pos_inicial
+            habitacion = Habitacion(
+                id=i,
+                x=x,
+                y=y,
+                inicial=es_inicial
+            )
+            self.habitaciones[(x, y)] = habitacion
+
+            if es_inicial:
+                self.habitacion_inicial = habitacion
+
+        # Conectar habitaciones adyacentes
+        direcciones = {
+            'norte': (0, -1),
+            'sur': (0, 1),
+            'este': (1, 0),
+            'oeste': (-1, 0)
+        }
+
+        for (x, y), habitacion in self.habitaciones.items():
+            for direccion, (dx, dy) in direcciones.items():
+                vecino_pos = (x + dx, y + dy)
+                if vecino_pos in self.habitaciones:
+                    habitacion.conexiones[direccion] = self.habitaciones[vecino_pos]
+        
+        if self.habitacion_inicial is None:
+            raise Exception("No se pudo establecer la habitación inicial")
+
+        visitadas = set()
+        cola = [self.habitacion_inicial]
+
+        while cola:
+            habitacion_actual = cola.pop(0)
+            pos_actual = (habitacion_actual.x, habitacion_actual.y)
+
+            if pos_actual not in visitadas:
+                visitadas.add(pos_actual)
+
+                # Agregar vecinos a la cola
+                for vecino in habitacion_actual.conexiones.values():
+                    pos_vecino = (vecino.x, vecino.y)
+                    if pos_vecino not in visitadas:
+                        cola.append(vecino)
+
+        # Verifica que todas las habitaciones son accesibles
+        if len(visitadas) != n_habitaciones:
+            raise Exception(f"Solo {len(visitadas)} de {n_habitaciones} habitaciones son accesibles desde la habitacion inicial.")
+
 
     def colocar_contenido(self):
         # Metodo que coloca el contenido de manera aleatoria en las habitaciones
