@@ -339,7 +339,7 @@ class ContenidoHabitacion:
         # Metodo que indica el tipo de contenido de la habitacion
         return "Generico"
 
-    def interactuar(self) -> str:
+    def interactuar(self, explorador) -> str:
         # Metodo para interactuar con elementos de la habitacion
         return "No pasa nada :3"
 
