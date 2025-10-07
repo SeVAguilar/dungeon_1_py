@@ -41,9 +41,11 @@ class Mapa:
 
     def generar_estructura(self, n_habitaciones: int):
         # Metodo que genera la estructura del mapa con conexiones aleatorias
+        # Valida que el numero de habitaciones tenga sentido con el tamaño del mapa
+        
         max_habitaciones = self.ancho * self.alto
         
-        
+        # Verifica que no haya mas habitaciones que celdas disponibles
         if n_habitaciones > max_habitaciones:
             raise ValueError(
                 f"No se pueden crear {n_habitaciones} habitaciones en un mapa de {self.ancho}x{self.alto}"
@@ -51,12 +53,13 @@ class Mapa:
         if n_habitaciones < 1:
             raise ValueError("Debe haber al menos 1 habitacion")
         
-        # Limpiar habitaciones
+        # Limpia habitaciones previas para empezar de 0
         self.habitaciones.clear()
         self.habitacion_inicial = None
 
-        # Generar posiciones aleatorias
+        # Crea una lista con todas las posiciones posibles del mapa
         todas_posiciones = [(x, y) for x in range(self.ancho) for y in range(self.alto)]
+        # Seleciona las posiciones aleatorias donde habra habitaciones
         posiciones_habitaciones = random.sample(todas_posiciones, n_habitaciones)
 
         # Elegir habitacion inicial en el borde
@@ -71,7 +74,7 @@ class Mapa:
         else:
             pos_inicial = posiciones_habitaciones[0]
 
-        # Crear las habitaciones
+        # Crear las habitaciones y las asigna al diccionario
         for i, (x, y) in enumerate(posiciones_habitaciones):
             es_inicial = (x, y) == pos_inicial
             habitacion = Habitacion(
@@ -82,6 +85,7 @@ class Mapa:
             )
             self.habitaciones[(x, y)] = habitacion
 
+            # Referencia a la habitacion inicial
             if es_inicial:
                 self.habitacion_inicial = habitacion
 
@@ -93,24 +97,28 @@ class Mapa:
             'oeste': (-1, 0)
         }
 
+        # Conecta cada habitacion con su vecino 
         for (x, y), habitacion in self.habitaciones.items():
             for direccion, (dx, dy) in direcciones.items():
                 vecino_pos = (x + dx, y + dy)
                 if vecino_pos in self.habitaciones:
                     habitacion.conexiones[direccion] = self.habitaciones[vecino_pos]
         
+        # Verifica que se establecio la habitacio inicial
         if self.habitacion_inicial is None:
             raise Exception("No se pudo establecer la habitación inicial")
 
-        visitadas = set()
-        cola = [self.habitacion_inicial]
+        #Verifica que todas las habitaciones son accesibles
+        visitadas = set() # Conjunto de habitaciones visitadas
+        cola = [self.habitacion_inicial] # Cola para el recorrido
 
         while cola:
-            habitacion_actual = cola.pop(0)
+            habitacion_actual = cola.pop(0) # Toma el primer elemento
             pos_actual = (habitacion_actual.x, habitacion_actual.y)
 
+            # Si no se ha visitado la posicion
             if pos_actual not in visitadas:
-                visitadas.add(pos_actual)
+                visitadas.add(pos_actual) #Se marca como visitada
 
                 # Agregar vecinos a la cola
                 for vecino in habitacion_actual.conexiones.values():
@@ -125,7 +133,89 @@ class Mapa:
 
     def colocar_contenido(self):
         # Metodo que coloca el contenido de manera aleatoria en las habitaciones
-        pass
+        
+        # Obtener habitaciones que no son iniciales
+        habitaciones_disponibles = [h for h in self.habitaciones.values() if not h.inicial]
+        
+        if not habitaciones_disponibles:
+            return  # No hay habitaciones disponibles -> termina
+        
+        # Colocar al menos un jefe en una esquina
+        esquinas = self._obtener_esquinas()
+        if esquinas:
+            jefe_pos = random.choice(esquinas) # Elige una esquina aleatoria
+            # Verifica que existe una habitacion en la esquina
+            if jefe_pos in self.habitaciones:
+                jefe = self._crear_jefe_aleatorio() # Crea jefe aleatorio
+                self.habitaciones[jefe_pos].contenido = jefe # Asigna jefe a la habitacion
+        
+        # Colocar algunos monstruos (25% de habitaciones restantes)
+        habitaciones_restantes = [
+                h for h in habitaciones_disponibles if h.contenido is None
+            ]
+        num_monstruos = max(1, len(habitaciones_restantes) // 4) # Calculo de 25%
+        
+        # Colocar los monstruos aleatoriamente
+        for _ in range(min(num_monstruos, len(habitaciones_restantes))):
+            habitacion = random.choice(habitaciones_restantes) # Habitacion al azar
+            habitacion.contenido = self._crear_monstruo_aleatorio() # Asignar monstruo
+            habitaciones_restantes.remove(habitacion) # Quitar habitacion disponible
+        
+        # Colocar tesoros (20% de habitaciones restantes)
+        num_tesoros = max(1, len(habitaciones_restantes) // 5) # Calcula 20%
+        
+        # Colocar los tesoros aleatoriamnete
+        for _ in range(min(num_tesoros, len(habitaciones_restantes))):
+            habitacion = random.choice(habitaciones_restantes) # Habitacion al azar
+            habitacion.contenido = self._crear_tesoro_aleatorio() # Asignar tesoro
+            habitaciones_restantes.remove(habitacion) # Quitar habitacion disponible
+
+    def _obtener_esquinas(self) -> list[tuple[int, int]]:
+        # Retorna las posiciones de las esquinas del mapa.
+        return [
+            (0, 0),                  # Esquina superior izquierda
+            (0, self.alto-1),         # Esquina inferior izquierda
+            (self.ancho-1, 0),         # Esquina superior derecha
+            (self.ancho-1, self.alto-1) # Esquina inferior derecha
+        ]
+
+    def _crear_jefe_aleatorio(self) -> "Jefe":
+        # Crea un jefe aleatorio y su recompenza
+        nombres = ["Rey Goblin", "Dragon Antiguo", "Rey Lich"]
+        recompensas = [
+            Objeto("Corona Dorada", 100, "Corona del rey Goblin que ha sido derrotado por un poderoso guerrero."),
+            Objeto("Gema del Poder", 250, "Gema mágica muy valiosa hecha de las escamas de un dragon"),
+            Objeto("Espada Legendaria", 200, "Arma de gran poder de un monarca de la noche")
+        ]
+        
+        # Selecciona aleatoriamente nombre y recompenza 
+        nombre = random.choice(nombres)
+        recompensa = random.choice(recompensas)
+        # Crea jefe con estadisticas fijas (vida, ataque)
+        return Jefe(nombre=nombre, vida=5, ataque=2, recompensa_especial=recompensa)
+        
+    
+    def _crear_monstruo_aleatorio(self) -> "Monstruo":
+        # Crea un monstruo aleatorio.
+        nombres = ["Goblin", "Orco", "Esqueleto", "Araña Gigante", "Ghoul"]
+        nombre = random.choice(nombres) # Elije nombre aleatorio
+        vida = random.randint(2, 4) # Vida entre 2 y 4 puntos
+        ataque = random.randint(1, 2) # Ataque entre 1 y 2 puntos
+        # Crea un monstruo con estadisticas variables
+        return Monstruo(nombre=nombre, vida=vida, ataque=ataque)
+
+    def _crear_tesoro_aleatorio(self) -> "Tesoro":
+        # Crea un tesoro aleatorio.
+        objetos = [
+            Objeto("Monedas de Oro", 25, "Monedas brillantes"),
+            Objeto("Poción de Vida", 15, "Restaura energía"),
+            Objeto("Gema Preciosa", 50, "Una gema valiosa"),
+            Objeto("Espada de Hierro", 30, "Arma básica pero útil")
+        ]
+        
+        objeto = random.choice(objetos)  # Selecciona objeto aleatorio
+        return Tesoro(recompensa=objeto)  # Crear tesoro con ese objeto
+
 
 
 @dataclass
@@ -187,7 +277,28 @@ class Explorador:
     def explorar_habitacion(self) -> str:     
         # Interactuar con el contenido de la habitación actual y marcarla 
         # como visitada
-        pass
+        
+        # Obtener habitacion actual
+        habitacion_actual = self.mapa.habitaciones.get(self.posicion_actual)
+
+        if habitacion_actual is None:
+            return "No hay habitacion en esta posicion"
+        
+        # Marcar como visitada
+        habitacion_actual.visitada = True
+
+        # Si no hay habitacion
+        if habitacion_actual.contenido is None:
+            return "La habitacion esta vacia... solo hay polvo."
+        
+        # Interactuar con el contenido
+        resultado = habitacion_actual.contenido.interactuar(self)
+
+        # Limpiar el contenido despues de interctuar
+        if isinstance(habitacion_actual.contenido, (Tesoro, Monstruo, Jefe)):
+            habitacion_actual.contenido = None
+
+        return resultado
 
     
     def obtener_habitaciones_adyacentes(self) -> list[str]:
@@ -241,6 +352,21 @@ class Tesoro(ContenidoHabitacion):
         recompensa: Objeto que se obtiene al recoger el tesoro
     """
     recompensa: Objeto
+    def interactuar(self, explorador) -> str:
+        # Permite al explorador recoger el tesoro.
+        # Agregar la recompensa al inventario del explorador
+        explorador.inventario.append(self.recompensa)
+        
+        return f"Has encontrado un tesoro! Obtuviste -> {self.recompensa.nombre}"
+
+    @property
+    def descripcion(self) -> str:
+        return f"Un gran tesoro que contiene: {self.recompensa.nombre}"
+
+    @property
+    def tipo(self) -> str:
+        return "Tesoro"
+
 @dataclass
 class Monstruo(ContenidoHabitacion):
     """
@@ -255,6 +381,36 @@ class Monstruo(ContenidoHabitacion):
     vida: int
     ataque: int
 
+    def interactuar(self, explorador) -> str:
+        # Simula el combate del enemigo vs el explorador
+        # Crea una lista que guarda la historia del combate
+        resultado = []
+        monstruo_vida = self.vida
+
+        # Registro inicial del combate
+        resultado.append(f"Alerta, te enfrentas a {self.nombre} :o")
+
+        # Bucle del combate: continua hasta que uno muera
+        while monstruo_vida > 0 and explorador.esta_vivo:
+            # 60% de que el explorador logre atacar exitosamente 
+            if random.random() < 0.6:
+                monstruo_vida -= 1 # Monstruo recibe daño
+                resultado.append(f"Atacas a {self.nombre}. Vida del enemigo: {monstruo_vida}")
+        
+            else:
+                explorador.recibir_dano(self.ataque) # Explorador recibe daño
+                resultado.append(f"{self.nombre} te inflinge {self.ataque} de daño. Tu vida: {explorador.vida}")
+
+        # Determina el resultado del combate
+        if not explorador.esta_vivo: # Explorador pierde
+            resultado.append(f"Has perdido... {self.nombre} te ha derrotado :()")
+        else:                        # Explorador gana
+            resultado.append(f"Has derrotado a {self.nombre} :3")
+
+        # Se agrega al registro del combate
+        return "\n".join(resultado)
+    
+
 @dataclass
 class Jefe(Monstruo):
     """
@@ -268,3 +424,41 @@ class Jefe(Monstruo):
     """
     recompensa_especial: Objeto
 
+
+    def interactuar(self, explorador) -> str:
+        # Simula el combate contra un jefe del dungeon
+
+        # Crea una lista que guarda la historia del combate
+        resultado = []
+        jefe_vida = self.vida
+
+        # Registro inicial del combate contra el jefe
+        resultado.append(f"PELIGRO! Te enfrentas a uno de los jefes de la mazmorra, {self.nombre} :o")
+
+        # Bucle del combate: continua hasta que uno muere 
+        while jefe_vida > 0 and explorador.esta_vivo:
+            # 40% de probabilidad 
+            if random.random() < 0.4:
+                jefe_vida -= 1; # El jefe recibe daño
+                resultado.append(f"Atacaste a {self.nombre}. Vida del jefe: {jefe_vida}")
+
+            else:
+                explorador.recibir_dano(self.ataque) # El explorador recibe MAS daño
+                resultado.append(f"El jefe {self.nombre} te inflinge {self.ataque} de daño. Tu vida: {explorador.vida}")
+
+        # Determina el resultado con recompensas
+        if not explorador.esta_vivo:
+            resultado.append(f"Has sido derrotado por el jefe {self.nombre}!!")
+        else:
+            # Si gana obtiene su recompensa 
+            explorador.inventario.append(self.recompensa_especial)
+            resultado.append(f"¡Has derrotado al jefe {self.nombre}!")
+            resultado.append(f"Felicidades, obtuviste una recompensa especial ---> <{self.recompensa_especial.nombre}>!")
+            
+            # 30% probabilidad de una segunda recompensa
+            if random.random() < 0.3:
+                explorador.inventario.append(self.recompensa_especial)
+                resultado.append("¡BONIFICACIÓN! ¡Obtuviste una segunda recompensa especial!")
+        
+        # Se agrega al registro del combate
+        return "\n".join(resultado)
